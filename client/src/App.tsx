@@ -70,6 +70,8 @@ export default function App() {
   const [showTrophyRoom, setShowTrophyRoom] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [isServerAwakening, setIsServerAwakening] = useState(false);
+  const [scenarioWaitSeconds, setScenarioWaitSeconds] = useState(0);
   const { width, height } = useWindowSize();
 
   useEffect(() => {
@@ -106,6 +108,8 @@ export default function App() {
 
     function onScenarioReady({ scenario }: { scenario: string }) {
       setScenario(scenario);
+      setIsServerAwakening(false);
+      setScenarioWaitSeconds(0);
     }
 
     function onGradingStarted() {
@@ -180,6 +184,23 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  // Track how long we've been waiting for the scenario (cold-start detection)
+  useEffect(() => {
+    if (gameStatus !== 'playing' || scenario !== null) {
+      setIsServerAwakening(false);
+      setScenarioWaitSeconds(0);
+      return;
+    }
+    const ticker = setInterval(() => {
+      setScenarioWaitSeconds((s) => {
+        const next = s + 1;
+        if (next === 5) setIsServerAwakening(true);
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(ticker);
+  }, [gameStatus, scenario]);
 
   function handleCreateGame() {
     if (!playerName.trim()) return;
@@ -302,7 +323,11 @@ export default function App() {
             className="w-full flex flex-col items-center"
           >
       {/* Main glassmorphic card */}
-      <div className="bg-[#0f1021]/80 backdrop-blur-md border border-indigo-500/30 rounded-2xl p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full relative z-10 text-center">
+      <div className={`bg-[#0f1021]/80 backdrop-blur-md border rounded-2xl p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full relative z-10 text-center transition-all duration-500 ${
+        gameStatus === 'grading' || (gameStatus === 'playing' && scenario === null)
+          ? 'border-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.35)] animate-pulse'
+          : 'border-indigo-500/30'
+      }`}>
         <h1 className="text-5xl font-black text-white mb-2 tracking-tight drop-shadow-lg">
           Prompt Master
         </h1>
@@ -328,7 +353,8 @@ export default function App() {
             />
             <button
               onClick={handleCreateGame}
-              className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-black text-xl py-4 px-8 rounded-xl shadow-[0_6px_0_0_#3730a3] active:shadow-none active:translate-y-[6px] transition-all"
+              disabled={!isConnected}
+              className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xl py-4 px-8 rounded-xl shadow-[0_6px_0_0_#3730a3] active:shadow-none active:translate-y-[6px] transition-all"
             >
               Create Game
             </button>
@@ -347,7 +373,8 @@ export default function App() {
             />
             <button
               onClick={handleJoinGame}
-              className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-black text-xl py-4 px-8 rounded-xl shadow-[0_6px_0_0_#b45309] active:shadow-none active:translate-y-[6px] transition-all"
+              disabled={!isConnected}
+              className="w-full bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed text-gray-900 font-black text-xl py-4 px-8 rounded-xl shadow-[0_6px_0_0_#b45309] active:shadow-none active:translate-y-[6px] transition-all"
             >
               Join Game
             </button>
@@ -355,9 +382,18 @@ export default function App() {
 
         ) : gameStatus === 'grading' ? (
           <div className="flex flex-col items-center gap-5 py-6">
-            <div className="w-14 h-14 border-4 border-purple-400/40 border-t-purple-300 rounded-full animate-spin" />
-            <p className="text-2xl font-black text-white text-center">⚖️ The AI is judging your prompts...</p>
-            <p className="text-white/50 font-semibold text-sm animate-pulse">This may take a moment. Brace yourself.</p>
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-purple-500/20 border-t-purple-400 animate-spin" />
+              <div className="absolute inset-2 rounded-full border-4 border-indigo-500/20 border-b-indigo-300 animate-spin [animation-direction:reverse]" />
+            </div>
+            <p className="text-2xl font-black text-white text-center">
+              {judgePersona ? `${judgePersona.split(' ').slice(0,2).join(' ')} is deliberating...` : '⚖️ The AI is judging your prompts...'}
+            </p>
+            {judgePersona && (
+              <p className="text-xs font-semibold text-purple-300/80 uppercase tracking-widest">Judge: {judgePersona}</p>
+            )}
+            <p className="text-white/40 font-semibold text-sm animate-pulse">This may take a moment. Brace yourself.</p>
+            <p className="text-white/25 text-xs mt-2">⚙️ Using free-tier neural nodes — spin-up may take up to 60 seconds.</p>
           </div>
 
         ) : gameStatus === 'results' && resultsData ? (
@@ -458,8 +494,41 @@ export default function App() {
 
             {scenario === null ? (
               <div className="flex flex-col items-center gap-3 py-8">
-                <div className="w-8 h-8 border-4 border-white/20 border-t-white/70 rounded-full animate-spin" />
-                <p className="text-white/50 font-semibold animate-pulse text-center">AI is generating your challenge...</p>
+                <div className="relative w-12 h-12">
+                  <div className="absolute inset-0 rounded-full border-4 border-white/10 border-t-white/60 animate-spin" />
+                  <div className="absolute inset-2 rounded-full border-4 border-indigo-400/10 border-b-indigo-300/60 animate-spin [animation-direction:reverse]" />
+                </div>
+                {isServerAwakening ? (
+                  <>
+                    <p className="text-yellow-300 font-black text-lg text-center animate-pulse">
+                      ☕ Waking up the Neural Brain...
+                    </p>
+                    <p className="text-white/50 font-semibold text-sm text-center">
+                      Free-tier cold start — this can take up to 60 seconds.
+                    </p>
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-full bg-yellow-400/70 rounded-full transition-all duration-1000"
+                        style={{ width: `${Math.min((scenarioWaitSeconds / 60) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-white/30 text-xs">{scenarioWaitSeconds}s elapsed</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-white/80 font-black text-lg text-center animate-pulse">🧠 Brain Syncing...</p>
+                    <p className="text-white/40 font-semibold text-sm text-center">AI is crafting your challenge — hold tight.</p>
+                  </>
+                )}
+                <p className="text-white/25 text-xs text-center mt-1">⚙️ Using free-tier neural nodes — spin-up may take up to 60 seconds.</p>
+                {scenarioWaitSeconds >= 30 && socketId === (players[0]?.socketId ?? '') && (
+                  <button
+                    onClick={() => socket.emit('start_game', { roomCode: activeRoom, settings: { timeLimit: hostTimeLimit, totalRounds: hostRounds } })}
+                    className="mt-2 text-xs font-black px-4 py-2 rounded-xl bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 transition-all"
+                  >
+                    🔄 Host: Retry Scenario Generation
+                  </button>
+                )}
               </div>
             ) : (
               <>
