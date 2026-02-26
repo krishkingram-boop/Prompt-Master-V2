@@ -23,7 +23,11 @@ const PROMPT_TECHNIQUES = [
   },
 ];
 
-const socket = io('http://localhost:3000');
+const SOCKET_URL = import.meta.env.PROD
+  ? 'https://prompt-master-v2.onrender.com'
+  : 'http://localhost:3000';
+
+const socket = io(SOCKET_URL);
 
 const BADGE_STYLES: Record<string, { pill: string; glow: string; label: string }> = {
   '🎭 The Method Actor':     { pill: 'bg-blue-100 text-blue-700 border-blue-300',    glow: 'shadow-[0_0_8px_2px_rgba(59,130,246,0.4)]',   label: '🎭 The Method Actor' },

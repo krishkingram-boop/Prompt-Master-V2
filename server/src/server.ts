@@ -12,6 +12,7 @@ const io = new Server(httpServer, {
     origin: [
       'http://localhost:5173',
       'https://prompt-master-v2.vercel.app',
+      'https://prompt-master-v2-chi.vercel.app',
     ],
     methods: ['GET', 'POST'],
   },
