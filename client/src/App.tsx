@@ -33,8 +33,6 @@ const BADGE_STYLES: Record<string, { pill: string; glow: string; label: string }
   '🧬 The Bootstrapper':     { pill: 'bg-orange-100 text-orange-700 border-orange-300',glow: 'shadow-[0_0_8px_2px_rgba(249,115,22,0.4)]', label: '🧬 The Bootstrapper' },
 };
 
-const ALL_BADGES = Object.keys(BADGE_STYLES);
-
 const TROPHY_TECHNIQUES = [
   { badge: '🎭 The Method Actor',      technique: 'Role Playing',        hint: 'Write "You are an..." or "Act as..."' },
   { badge: '✂️ The Stylist',           technique: 'Style Unbundling',    hint: 'Use "bullet points" or "following style"' },
