@@ -7,13 +7,17 @@ import { GoogleGenAI } from '@google/genai';
 const app = express();
 const httpServer = http.createServer(app);
 
+const ALLOWED_ORIGIN = /^https:\/\/prompt-master-v2[a-z0-9\-]*\.vercel\.app$/;
+
 const io = new Server(httpServer, {
   cors: {
-    origin: [
-      'http://localhost:5173',
-      'https://prompt-master-v2.vercel.app',
-      'https://prompt-master-v2-chi.vercel.app',
-    ],
+    origin: (origin, callback) => {
+      if (!origin || origin === 'http://localhost:5173' || ALLOWED_ORIGIN.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
     methods: ['GET', 'POST'],
   },
 });
