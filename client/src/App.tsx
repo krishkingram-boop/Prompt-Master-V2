@@ -24,7 +24,7 @@ const PROMPT_TECHNIQUES = [
 ];
 
 const SOCKET_URL = import.meta.env.PROD
-  ? 'https://prompt-master-v2.onrender.com'
+  ? 'https://prompt-a-thon-kahoot-style.onrender.com'
   : 'http://localhost:3000';
 
 const socket = io(SOCKET_URL);
@@ -70,8 +70,6 @@ export default function App() {
   const [showTrophyRoom, setShowTrophyRoom] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
-  const [isServerAwakening, setIsServerAwakening] = useState(false);
-  const [scenarioWaitSeconds, setScenarioWaitSeconds] = useState(0);
   const { width, height } = useWindowSize();
 
   useEffect(() => {
@@ -108,8 +106,6 @@ export default function App() {
 
     function onScenarioReady({ scenario }: { scenario: string }) {
       setScenario(scenario);
-      setIsServerAwakening(false);
-      setScenarioWaitSeconds(0);
     }
 
     function onGradingStarted() {
@@ -184,23 +180,6 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
-
-  // Track how long we've been waiting for the scenario (cold-start detection)
-  useEffect(() => {
-    if (gameStatus !== 'playing' || scenario !== null) {
-      setIsServerAwakening(false);
-      setScenarioWaitSeconds(0);
-      return;
-    }
-    const ticker = setInterval(() => {
-      setScenarioWaitSeconds((s) => {
-        const next = s + 1;
-        if (next === 5) setIsServerAwakening(true);
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(ticker);
-  }, [gameStatus, scenario]);
 
   function handleCreateGame() {
     if (!playerName.trim()) return;
@@ -393,7 +372,6 @@ export default function App() {
               <p className="text-xs font-semibold text-purple-300/80 uppercase tracking-widest">Judge: {judgePersona}</p>
             )}
             <p className="text-white/40 font-semibold text-sm animate-pulse">This may take a moment. Brace yourself.</p>
-            <p className="text-white/25 text-xs mt-2">⚙️ Using free-tier neural nodes — spin-up may take up to 60 seconds.</p>
           </div>
 
         ) : gameStatus === 'results' && resultsData ? (
@@ -498,37 +476,8 @@ export default function App() {
                   <div className="absolute inset-0 rounded-full border-4 border-white/10 border-t-white/60 animate-spin" />
                   <div className="absolute inset-2 rounded-full border-4 border-indigo-400/10 border-b-indigo-300/60 animate-spin [animation-direction:reverse]" />
                 </div>
-                {isServerAwakening ? (
-                  <>
-                    <p className="text-yellow-300 font-black text-lg text-center animate-pulse">
-                      ☕ Waking up the Neural Brain...
-                    </p>
-                    <p className="text-white/50 font-semibold text-sm text-center">
-                      Free-tier cold start — this can take up to 60 seconds.
-                    </p>
-                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="h-full bg-yellow-400/70 rounded-full transition-all duration-1000"
-                        style={{ width: `${Math.min((scenarioWaitSeconds / 60) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <p className="text-white/30 text-xs">{scenarioWaitSeconds}s elapsed</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-white/80 font-black text-lg text-center animate-pulse">🧠 Brain Syncing...</p>
-                    <p className="text-white/40 font-semibold text-sm text-center">AI is crafting your challenge — hold tight.</p>
-                  </>
-                )}
-                <p className="text-white/25 text-xs text-center mt-1">⚙️ Using free-tier neural nodes — spin-up may take up to 60 seconds.</p>
-                {scenarioWaitSeconds >= 30 && socketId === (players[0]?.socketId ?? '') && (
-                  <button
-                    onClick={() => socket.emit('start_game', { roomCode: activeRoom, settings: { timeLimit: hostTimeLimit, totalRounds: hostRounds } })}
-                    className="mt-2 text-xs font-black px-4 py-2 rounded-xl bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 transition-all"
-                  >
-                    🔄 Host: Retry Scenario Generation
-                  </button>
-                )}
+                <p className="text-white/80 font-black text-lg text-center animate-pulse">🧠 AI is generating your challenge...</p>
+                <p className="text-white/40 font-semibold text-sm text-center">Hold tight — the neural engine is crafting your scenario.</p>
               </div>
             ) : (
               <>
