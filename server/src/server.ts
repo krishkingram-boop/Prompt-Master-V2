@@ -5,24 +5,18 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
 
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'https://prompt-master-v2-chi.vercel.app',
-];
-
 const app = express();
 app.use(cors({
-  origin: ALLOWED_ORIGINS,
+  origin: '*',
   methods: ['GET', 'POST'],
-  credentials: true,
 }));
+app.get('/health', (_req, res) => res.status(200).send('OK'));
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,
+    origin: '*',
     methods: ['GET', 'POST'],
-    credentials: true,
   },
 });
 
@@ -413,7 +407,4 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT as number, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+httpServer.listen(Number(process.env.PORT) || 3000, '0.0.0.0', () => console.log('Live'));
