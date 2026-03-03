@@ -25,7 +25,7 @@ const PROMPT_TECHNIQUES = [
 
 const SOCKET_URL = import.meta.env.DEV
   ? 'http://localhost:3000'
-  : 'https://prompt-a-thon-kahoot-style.onrender.com';
+  : 'https://prompt-master-v2-production.up.railway.app';
 
 const socket = io(SOCKET_URL, { transports: ['websocket'] });
 
