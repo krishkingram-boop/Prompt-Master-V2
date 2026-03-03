@@ -102,40 +102,46 @@ function checkForBadges(prompt: string): string[] {
 
 async function gradeAndEmitResults(room: Room, roomCode: string): Promise<void> {
   try {
-    // Extract the technique line from the scenario (format: "TECHNIQUE: Name — description")
     const techniqueLine = (room.currentScenario ?? '').split('\n')[0]?.replace(/^TECHNIQUE:\s*/i, '').trim()
       ?? 'the requested prompt engineering technique';
 
+    const TIMEOUT_MS = 5000;
+
     // Grade each submission individually in parallel
+    console.time('GeminiGrading');
     const gradePromises = room.submissions.map(async (submission) => {
-      const prompt = `You are Gordon Ramsay, the world's most aggressive and demanding Michelin-star chef, but instead of food, you are grading Prompt Engineering!
+      const prompt = `Judge. Technique: ${techniqueLine}. Prompt: "${submission.prompt}". Score 0-100. JSON only: {"score":number,"critique":"10 words max"}.`;
 
-The player was asked to use a specific prompt engineering technique: ${techniqueLine}
-The player submitted this prompt: "${submission.prompt}"
+      const geminiCall = async () => {
+        try {
+          console.time(`Gemini_Latency:${submission.socketId}`);
+          const response = await genAI.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
+            config: { maxOutputTokens: 50, temperature: 0.4 },
+          });
+          console.timeEnd(`Gemini_Latency:${submission.socketId}`);
+          const rawText = (response.text ?? '').trim()
+            .replace(/^```(?:json)?\s*/i, '')
+            .replace(/```\s*$/, '')
+            .trim();
+          return JSON.parse(rawText) as { score: number; critique: string };
+        } catch (err: unknown) {
+          const code = (err as { status?: number })?.status ?? (err as { code?: number })?.code;
+          const reason = code === 429 ? '429 rate limit hit' : 'API connection interrupted';
+          console.error(`⚠️ Gemini error for ${submission.playerName} (${reason}):`, err);
+          return { score: Math.floor(Math.random() * 41) + 40, critique: 'AI connection interrupted.' };
+        }
+      };
 
-Grade their prompt based strictly on how well they applied the requested technique.
+      const timeout = new Promise<{ score: number; critique: string }>((resolve) =>
+        setTimeout(() => {
+          console.warn(`⚠️ Gemini timeout for ${submission.playerName} — using fallback score`);
+          resolve({ score: Math.floor(Math.random() * 41) + 40, critique: 'Timed out. Fallback score assigned.' });
+        }, TIMEOUT_MS)
+      );
 
-SCORING RUBRIC:
-0-40 (Raw & Disgusting): They completely ignored the technique. Roast them mercilessly using culinary insults (e.g., "This prompt is so raw it's still grazing in the field!").
-41-75 (Bland & Mediocre): They tried to use the technique, but it's weak, generic, or missing key steps. Tell them it lacks seasoning and effort.
-76-100 (Michelin Star): They executed the technique perfectly (e.g., provided great few-shot examples, set a strong persona, or unbundled the style properly). Give them a rare, aggressive compliment!
-
-You MUST return your response as a valid JSON object with exactly two keys:
-"score": a number from 0 to 100.
-"critique": a short, 2-to-3 sentence review in the voice of Gordon Ramsay.
-
-Return raw JSON only. No markdown, no code fences.`;
-
-      const response = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-
-      const rawText = (response.text ?? '').trim()
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/```\s*$/, '')
-        .trim();
-      const parsed = JSON.parse(rawText) as { score: number; critique: string };
+      const parsed = await Promise.race([geminiCall(), timeout]);
       const player = room.players.find((p) => p.socketId === submission.socketId);
 
       // If the player scored 76+ (Michelin Star), award the technique badge
@@ -159,6 +165,7 @@ Return raw JSON only. No markdown, no code fences.`;
     });
 
     const grades = await Promise.all(gradePromises);
+    console.timeEnd('GeminiGrading');
     console.log(`Grades for room ${roomCode}:`, grades);
     io.to(roomCode).emit('results_ready', {
       grades,
@@ -168,7 +175,21 @@ Return raw JSON only. No markdown, no code fences.`;
     });
   } catch (err) {
     console.error('Grading error:', err);
-    io.to(roomCode).emit('error', { message: 'AI grading failed. Please try again.' });
+    // Always emit results so the frontend never hangs on the grading screen
+    const fallbackGrades = room.submissions.map((s) => ({
+      socketId: s.socketId,
+      playerName: room.players.find((p) => p.socketId === s.socketId)?.playerName ?? 'Mystery Player',
+      score: Math.floor(Math.random() * 41) + 40,
+      feedback: 'AI connection interrupted.',
+      submittedPrompt: s.prompt,
+      badges: room.players.find((p) => p.socketId === s.socketId)?.badges ?? [],
+    }));
+    io.to(roomCode).emit('results_ready', {
+      grades: fallbackGrades,
+      currentRound: room.currentRound,
+      totalRounds: room.settings.totalRounds,
+      judgePersona: 'Gordon Ramsay',
+    });
   }
 }
 
