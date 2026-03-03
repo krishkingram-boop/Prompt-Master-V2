@@ -27,7 +27,7 @@ const SOCKET_URL = import.meta.env.DEV
   ? 'http://localhost:3000'
   : 'https://prompt-master-v2-production.up.railway.app';
 
-const socket = io(SOCKET_URL, { transports: ['polling', 'websocket'] });
+const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
 
 const BADGE_STYLES: Record<string, { pill: string; glow: string; label: string }> = {
   '🎭 The Method Actor':     { pill: 'bg-blue-100 text-blue-700 border-blue-300',    glow: 'shadow-[0_0_8px_2px_rgba(59,130,246,0.4)]',   label: '🎭 The Method Actor' },

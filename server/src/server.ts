@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST'],
