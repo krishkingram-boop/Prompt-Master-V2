@@ -1,14 +1,25 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
+const ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+    'https://prompt-master-v2-chi.vercel.app',
+];
 const app = express();
+app.use(cors({
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST'],
+    credentials: true,
+}));
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
+        origin: ALLOWED_ORIGINS,
+        methods: ['GET', 'POST'],
+        credentials: true,
     },
 });
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
