@@ -25,7 +25,7 @@ const PROMPT_TECHNIQUES = [
 
 const SOCKET_URL = import.meta.env.DEV
   ? 'http://localhost:3000'
-  : 'https://prompt-master-v2-production.up.railway.app';
+  : 'https://prompt-master-brain.onrender.com';
 
 const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
 
