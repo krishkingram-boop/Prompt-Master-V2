@@ -59,7 +59,43 @@ const JUDGE_PERSONAS = [
   'A conspiracy theorist who sees hidden meaning in everything',
 ];
 
+const GAME_SCENARIOS = [
+  // Round 1 – Role Playing
+  `TECHNIQUE: Role Playing — Telling the AI to act as a famous expert or celebrity.
+
+SCENARIO: You need a highly motivational pep talk written for your struggling amateur esports team. Write a prompt that forces the AI to adopt the persona of an intense, legendary, and historically aggressive military commander (like Sun Tzu or Winston Churchill) to write this speech.`,
+
+  // Round 2 – Style Unbundling
+  `TECHNIQUE: Style Unbundling — Describing what you like about a style rather than copying directly.
+
+SCENARIO: You want to write a sci-fi short story about a rogue AI on a space station, but you want it in the eerie tone of Edgar Allan Poe. Write a two-part prompt: First, ask the AI to list the key elements of a 19th-century gothic horror writer's style. Second, instruct it to write your sci-fi story using those specific stylistic elements.`,
+
+  // Round 3 – Emotion Prompting
+  `TECHNIQUE: Emotion Prompting — Using emotional blackmail and persuasion with the AI.
+
+SCENARIO: You accidentally deleted the main company database and need the AI to write a flawless, deeply apologetic email to your angry boss. Write a prompt that utilises 'emotional prompting' — tell the AI that your job is on the line, you are panicking, and this task is crucial for your career survival.`,
+
+  // Round 4 – Few-Shot Learning
+  `TECHNIQUE: Few-Shot Learning — Adding examples of the completed task to the prompt.
+
+SCENARIO: You need the AI to classify customer reviews into 'Positive', 'Neutral', or 'Negative' using a specific emoji format. Write a prompt that provides the AI with at least three examples of reviews mapped to their correct emoji (Few-Shot Learning), and then ask it to classify a new review about a pizza arriving cold.`,
+
+  // Round 5 – Synthetic Bootstrap
+  `TECHNIQUE: Synthetic Bootstrap — Use AI to generate good examples of the completed task first.
+
+SCENARIO: You are brainstorming a catchy name for a brand of spicy lemonade but have writer's block. Write a multi-step prompt: First, ask the AI to generate 5 examples of clever, edgy beverage names. Then, instruct the AI to use those generated inputs as inspiration to create the final name for your spicy lemonade.`,
+];
+
 const rooms = new Map<string, Room>();
+
+// Maps the short technique name (from the GAME_SCENARIOS first line) to the badge string
+const TECHNIQUE_TO_BADGE: Record<string, string> = {
+  'Role Playing':        '🎭 The Method Actor',
+  'Style Unbundling':    '✂️ The Stylist',
+  'Emotion Prompting':   '😢 Emotional Manipulator',
+  'Few-Shot Learning':   '🐦 The Copycat',
+  'Synthetic Bootstrap': '🧬 The Bootstrapper',
+};
 
 function checkForBadges(prompt: string): string[] {
   const p = prompt.toLowerCase();
@@ -74,33 +110,70 @@ function checkForBadges(prompt: string): string[] {
 
 async function gradeAndEmitResults(room: Room, roomCode: string): Promise<void> {
   try {
-    const gradingPrompt = `You are grading these prompts as ${room.currentPersona}. Your 1-sentence feedback MUST be written exactly in their voice, vocabulary, and personality!
-Grade these prompts based on how well they fulfill the scenario.
-Scenario: "${room.currentScenario}"
-Submissions:
-${room.submissions.map((s, i) => `${i + 1}. socketId: "${s.socketId}", playerName: "${s.playerName}", prompt: "${s.prompt}"`).join('\n')}
+    // Extract the technique line from the scenario (format: "TECHNIQUE: Name — description")
+    const techniqueLine = (room.currentScenario ?? '').split('\n')[0]?.replace(/^TECHNIQUE:\s*/i, '').trim()
+      ?? 'the requested prompt engineering technique';
 
-Return a strict JSON array of objects with no markdown, no code fences, just raw JSON. Each object must have:
-- "socketId": the player's socket id (string)
-- "playerName": the player's name (string)
-- "score": a number from 1 to 100
-- "feedback": one short, funny sentence written in the voice of ${room.currentPersona}`;
+    // Grade each submission individually in parallel
+    const gradePromises = room.submissions.map(async (submission) => {
+      const prompt = `You are Gordon Ramsay, the world's most aggressive and demanding Michelin-star chef, but instead of food, you are grading Prompt Engineering!
 
-    const response = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: gradingPrompt,
-    });
+The player was asked to use a specific prompt engineering technique: ${techniqueLine}
+The player submitted this prompt: "${submission.prompt}"
 
-    const rawText = (response.text ?? '').trim();
-    const rawGrades = JSON.parse(rawText);
-    const grades = rawGrades.map((grade: { socketId: string; score: number; feedback: string; playerName?: string }) => {
-      const player = room.players.find((p) => p.socketId === grade.socketId);
+Grade their prompt based strictly on how well they applied the requested technique.
+
+SCORING RUBRIC:
+0-40 (Raw & Disgusting): They completely ignored the technique. Roast them mercilessly using culinary insults (e.g., "This prompt is so raw it's still grazing in the field!").
+41-75 (Bland & Mediocre): They tried to use the technique, but it's weak, generic, or missing key steps. Tell them it lacks seasoning and effort.
+76-100 (Michelin Star): They executed the technique perfectly (e.g., provided great few-shot examples, set a strong persona, or unbundled the style properly). Give them a rare, aggressive compliment!
+
+You MUST return your response as a valid JSON object with exactly two keys:
+"score": a number from 0 to 100.
+"critique": a short, 2-to-3 sentence review in the voice of Gordon Ramsay.
+
+Return raw JSON only. No markdown, no code fences.`;
+
+      const response = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      const rawText = (response.text ?? '').trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/```\s*$/, '')
+        .trim();
+      const parsed = JSON.parse(rawText) as { score: number; critique: string };
+      const player = room.players.find((p) => p.socketId === submission.socketId);
+
+      // If the player scored 76+ (Michelin Star), award the technique badge
+      if (player && parsed.score >= 76) {
+        const techniqueName = techniqueLine.split('—')[0]?.trim() ?? '';
+        const techniqueToAward = TECHNIQUE_TO_BADGE[techniqueName];
+        if (techniqueToAward && !player.badges.includes(techniqueToAward)) {
+          player.badges.push(techniqueToAward);
+          console.log(`🏆 Score badge awarded to ${player.playerName}: ${techniqueToAward} (score: ${parsed.score})`);
+        }
+      }
+
       return {
-        ...grade,
-        playerName: player?.playerName ?? 'Mystery Player',        badges: player?.badges ?? [],      };
+        socketId: submission.socketId,
+        playerName: player?.playerName ?? 'Mystery Player',
+        score: parsed.score,
+        feedback: parsed.critique,
+        submittedPrompt: submission.prompt,
+        badges: player?.badges ?? [],
+      };
     });
+
+    const grades = await Promise.all(gradePromises);
     console.log(`Grades for room ${roomCode}:`, grades);
-    io.to(roomCode).emit('results_ready', { grades, currentRound: room.currentRound, totalRounds: room.settings.totalRounds, judgePersona: room.currentPersona });
+    io.to(roomCode).emit('results_ready', {
+      grades,
+      currentRound: room.currentRound,
+      totalRounds: room.settings.totalRounds,
+      judgePersona: 'Gordon Ramsay',
+    });
   } catch (err) {
     console.error('Grading error:', err);
     io.to(roomCode).emit('error', { message: 'AI grading failed. Please try again.' });
@@ -116,16 +189,12 @@ function generateRoomCode(): string {
   return code;
 }
 
-async function generateScenarioAndStartTimer(room: Room, roomCode: string): Promise<void> {
-  try {
-    const response = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: 'Generate a short, funny, 1-sentence scenario for a prompt engineering game where players have to write a prompt. For example: Try to make an AI act like a pirate selling a used car.',
-    });
-    const scenario = response.text ?? 'Write a prompt that makes an AI confess its deepest fears to a rubber duck.';
-    room.currentScenario = scenario;
-    console.log(`Scenario for room ${roomCode} (round ${room.currentRound}): ${scenario}`);
-    io.to(roomCode).emit('scenario_ready', { scenario });
+function generateScenarioAndStartTimer(room: Room, roomCode: string): void {
+  const scenarioIndex = room.currentRound - 1;
+  const scenario = GAME_SCENARIOS[scenarioIndex] ?? GAME_SCENARIOS[0]!;
+  room.currentScenario = scenario;
+  console.log(`Scenario for room ${roomCode} (round ${room.currentRound}): index ${scenarioIndex}`);
+  io.to(roomCode).emit('scenario_ready', { scenario });
 
     // Start the timer ONLY after the scenario is ready
     room.timeLeft = room.settings.timeLimit;
@@ -145,10 +214,6 @@ async function generateScenarioAndStartTimer(room: Room, roomCode: string): Prom
         }
       }
     }, 1000);
-  } catch (err) {
-    console.error('Scenario generation error:', err);
-    io.to(roomCode).emit('error', { message: 'Failed to generate scenario. Please try again.' });
-  }
 }
 
 io.on('connection', (socket) => {
@@ -324,6 +389,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT ?? 3000;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });

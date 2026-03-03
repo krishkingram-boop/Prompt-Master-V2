@@ -23,9 +23,9 @@ const PROMPT_TECHNIQUES = [
   },
 ];
 
-const SOCKET_URL = import.meta.env.PROD
-  ? 'https://prompt-a-thon-kahoot-style.onrender.com'
-  : 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.DEV
+  ? 'http://localhost:3000'
+  : 'https://prompt-a-thon-kahoot-style.onrender.com';
 
 const socket = io(SOCKET_URL, { transports: ['websocket'] });
 
@@ -56,7 +56,7 @@ export default function App() {
   const [scenario, setScenario] = useState<string | null>(null);
   const [playerPrompt, setPlayerPrompt] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [resultsData, setResultsData] = useState<{ socketId: string; playerName: string; score: number; feedback: string; badges: string[] }[] | null>(null);
+  const [resultsData, setResultsData] = useState<{ socketId: string; playerName: string; score: number; feedback: string; submittedPrompt?: string; badges: string[] }[] | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [currentRound, setCurrentRound] = useState(1);
   const [totalRounds, setTotalRounds] = useState(3);
@@ -70,6 +70,7 @@ export default function App() {
   const [showTrophyRoom, setShowTrophyRoom] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [hoveredEntry, setHoveredEntry] = useState<string | null>(null);
   const { width, height } = useWindowSize();
 
   useEffect(() => {
@@ -112,7 +113,7 @@ export default function App() {
       setGameStatus('grading');
     }
 
-    function onResultsReady({ grades, currentRound, totalRounds, judgePersona }: { grades: { socketId: string; playerName: string; score: number; feedback: string; badges: string[] }[]; currentRound?: number; totalRounds?: number; judgePersona?: string }) {
+    function onResultsReady({ grades, currentRound, totalRounds, judgePersona }: { grades: { socketId: string; playerName: string; score: number; feedback: string; submittedPrompt?: string; badges: string[] }[]; currentRound?: number; totalRounds?: number; judgePersona?: string }) {
       setResultsData(grades);
       setGameStatus('results');
       if (currentRound !== undefined) setCurrentRound(currentRound);
@@ -383,6 +384,7 @@ export default function App() {
               {judgePersona && (
                 <p className="text-sm font-bold text-purple-300 mt-1">Graded by: <span className="italic">{judgePersona}</span></p>
               )}
+              <p className="text-white/30 text-xs mt-1">Hover a player to see their prompt &amp; critique</p>
             </div>
             {[...resultsData]
               .sort((a, b) => b.score - a.score)
@@ -392,42 +394,69 @@ export default function App() {
                   initial={{ opacity: 0, y: 50, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: index * 0.3, type: 'spring', bounce: 0.5 }}
-                  className={`rounded-2xl p-5 flex items-center gap-4 border ${
+                  className="relative"
+                  onMouseEnter={() => setHoveredEntry(entry.socketId)}
+                  onMouseLeave={() => setHoveredEntry(null)}
+                >
+                  {/* Main score card */}
+                  <div className={`rounded-2xl p-5 flex items-center gap-4 border cursor-default ${
                     index === 0
                       ? 'bg-gradient-to-r from-yellow-400 to-amber-400 border-amber-500'
                       : 'bg-white/10 backdrop-blur-sm border-white/20'
-                  }`}
-                >
-                  <span className="text-3xl">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
-                  <img
-                    src={`https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(entry.playerName)}`}
-                    alt={entry.playerName}
-                    className="w-10 h-10 rounded-full bg-white/20 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-black text-lg truncate ${index === 0 ? 'text-amber-900' : 'text-white'}`}>
-                      {entry.playerName}
-                    </p>
-                    <p className={`text-sm font-medium leading-snug mt-0.5 ${index === 0 ? 'text-amber-800' : 'text-white/60'}`}>
-                      {entry.feedback}
-                    </p>
-                    {entry.badges?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {entry.badges.map((badge) => {
-                          const style = BADGE_STYLES[badge];
-                          if (!style) return null;
-                          return (
-                            <span key={badge} className={`text-xs font-black px-2 py-0.5 rounded-full border ${style.pill} ${style.glow}`}>
-                              {style.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
+                  }`}>
+                    <span className="text-3xl">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
+                    <img
+                      src={`https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${encodeURIComponent(entry.playerName)}`}
+                      alt={entry.playerName}
+                      className="w-10 h-10 rounded-full bg-white/20 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-black text-lg truncate ${index === 0 ? 'text-amber-900' : 'text-white'}`}>
+                        {entry.playerName}
+                      </p>
+                      {entry.badges?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {entry.badges.map((badge) => {
+                            const style = BADGE_STYLES[badge];
+                            if (!style) return null;
+                            return (
+                              <span key={badge} className={`text-xs font-black px-2 py-0.5 rounded-full border ${style.pill} ${style.glow}`}>
+                                {style.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <span className={`text-5xl font-black tabular-nums ${index === 0 ? 'text-amber-900' : 'text-white'}`}>
+                        {entry.score}
+                      </span>
+                      <span className={`text-xs font-semibold ${index === 0 ? 'text-amber-800' : 'text-white/40'}`}>pts</span>
+                    </div>
                   </div>
-                  <span className={`text-5xl font-black tabular-nums ${index === 0 ? 'text-amber-900' : 'text-white'}`}>
-                    {entry.score}
-                  </span>
+
+                  {/* Hover tooltip – prompt + critique */}
+                  {hoveredEntry === entry.socketId && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 bg-[#0a0d1f]/95 backdrop-blur-xl border border-indigo-500/40 rounded-2xl p-4 shadow-[0_0_30px_rgba(99,102,241,0.25)] text-left"
+                    >
+                      {entry.submittedPrompt && (
+                        <div className="mb-3">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">✍️ Their Prompt</p>
+                          <p className="text-white/80 text-xs leading-relaxed font-mono bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                            {entry.submittedPrompt}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">🍳 Gordon's Verdict</p>
+                        <p className="text-white/70 text-xs leading-relaxed italic">"{entry.feedback}"</p>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               ))}
             {socketId === hostId && (
@@ -650,13 +679,19 @@ export default function App() {
                       earned ? `${style.pill} ${style.glow} border-current` : 'bg-white/5 border-white/10'
                     }`}
                   >
-                    <span className={`text-2xl ${earned ? '' : 'grayscale opacity-30'}`}>
+                    <span
+                      className={`text-2xl transition-all duration-300 ${
+                        earned
+                          ? 'drop-shadow-[0_0_10px_rgba(251,191,36,0.9)] scale-110'
+                          : 'grayscale opacity-30'
+                      }`}
+                    >
                       {badge.split(' ')[0]}
                     </span>
                     <div className="flex-1">
                       <p className={`font-black text-sm ${earned ? '' : 'text-white/30'}`}>{technique}</p>
                       <p className={`text-xs font-semibold ${earned ? 'opacity-70' : 'text-white/20'}`}>
-                        {earned ? `✅ Earned — ${badge.replace(/^\S+\s*/, '')}` : `🔒 ${hint}`}
+                        {earned ? `✅ Earned — ${badge.replace(/^\S+\s*/, '')}` : hint}
                       </p>
                     </div>
                   </div>
