@@ -6,10 +6,6 @@
 # Dependencies
 node_modules/
 
-# Build outputs
-dist/
-dist-ssr/
-
 # Logs
 logs/
 *.log
