@@ -304,7 +304,7 @@ export default function App() {
           >
       {/* Main glassmorphic card */}
       <div className={`bg-[#0f1021]/80 backdrop-blur-md border rounded-2xl p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full relative z-10 text-center transition-all duration-500 ${
-        gameStatus === 'grading' || (gameStatus === 'playing' && scenario === null)
+        gameStatus === 'grading'
           ? 'border-purple-500/60 shadow-[0_0_60px_rgba(168,85,247,0.35)] animate-pulse'
           : 'border-indigo-500/30'
       }`}>
@@ -505,8 +505,8 @@ export default function App() {
                   <div className="absolute inset-0 rounded-full border-4 border-white/10 border-t-white/60 animate-spin" />
                   <div className="absolute inset-2 rounded-full border-4 border-indigo-400/10 border-b-indigo-300/60 animate-spin [animation-direction:reverse]" />
                 </div>
-                <p className="text-white/80 font-black text-lg text-center animate-pulse">🧠 AI is generating your challenge...</p>
-                <p className="text-white/40 font-semibold text-sm text-center">Hold tight — the neural engine is crafting your scenario.</p>
+                <p className="text-white/80 font-black text-lg text-center animate-pulse">⚡ Loading your challenge...</p>
+                <p className="text-white/40 font-semibold text-sm text-center">Get ready — your scenario is on its way.</p>
               </div>
             ) : (
               <>
