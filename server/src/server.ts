@@ -527,7 +527,8 @@ io.on('connection', (socket) => {
 });
 
 // ─── SPA fallback — serve index.html for all non-API routes ─────────────────
-app.get('*', (_req, res) => {
+// Express 5 dropped '*' wildcard — use app.use() for catch-all
+app.use((_req, res) => {
   res.sendFile(path.join(CLIENT_DIST, 'index.html'));
 });
 
