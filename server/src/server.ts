@@ -2,13 +2,22 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CLIENT_DIST = path.join(__dirname, '../../client/dist');
 
 const app = express();
 app.set('trust proxy', 1);
 app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
 app.get('/health', (_req, res) => res.status(200).send('OK'));
+
+// Serve React frontend in production
+app.use(express.static(CLIENT_DIST));
+
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
@@ -515,6 +524,11 @@ io.on('connection', (socket) => {
       break;
     }
   });
+});
+
+// ─── SPA fallback — serve index.html for all non-API routes ─────────────────
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(CLIENT_DIST, 'index.html'));
 });
 
 // ─── Stale room cleanup (every 10 minutes) ───────────────────────────────────

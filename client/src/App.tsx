@@ -20,7 +20,7 @@ const TECHNIQUE_TEMPLATES: Record<string, string> = {
 
 const SOCKET_URL = import.meta.env.DEV
   ? 'http://localhost:3000'
-  : 'https://prompt-master-brain.onrender.com';
+  : window.location.origin;
 
 const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
 
