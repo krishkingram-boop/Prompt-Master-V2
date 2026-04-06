@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
@@ -41,6 +41,15 @@ const TROPHY_TECHNIQUES = [
 ];
 
 const MEDAL = ['🥇', '🥈', '🥉'];
+
+// Pre-generate star data so Math.random() isn't called on every render
+const PODIUM_STARS = Array.from({ length: 20 }, () => ({
+  width: Math.random() * 3 + 1,
+  top: `${Math.random() * 100}%`,
+  left: `${Math.random() * 100}%`,
+  duration: Math.random() * 3 + 1,
+  delay: Math.random() * 2,
+}));
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -274,7 +283,7 @@ export default function App() {
 
   // ── Theme ────────────────────────────────────────────────────
   const dk = isDarkMode;
-  const t = {
+  const t = useMemo(() => ({
     card:        dk ? 'bg-[#0f1021]/85 border-indigo-500/30' : 'bg-white/95 border-indigo-200',
     text:        dk ? 'text-white' : 'text-gray-900',
     textMuted:   dk ? 'text-white/50' : 'text-gray-500',
@@ -301,7 +310,7 @@ export default function App() {
                     : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-indigo-400',
     cboardBg:    dk ? 'bg-[#0a0d1f]/90 border-indigo-500/30' : 'bg-white border-indigo-200',
     cboardRow:   dk ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200',
-  };
+  }), [dk]);
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -367,17 +376,17 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#06091a] via-[#130d2e] to-[#06091a] overflow-hidden"
           >
-            <Confetti width={width} height={height} numberOfPieces={300} recycle={false} />
+            <Confetti width={width} height={height} numberOfPieces={150} recycle={false} />
 
             {/* Stars background */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {Array.from({ length: 40 }).map((_, i) => (
+              {PODIUM_STARS.map((star, i) => (
                 <motion.div
                   key={i}
                   className="absolute rounded-full bg-white"
-                  style={{ width: Math.random() * 3 + 1, height: Math.random() * 3 + 1, top: `${Math.random() * 100}%`, left: `${Math.random() * 100}%` }}
+                  style={{ width: star.width, height: star.width, top: star.top, left: star.left }}
                   animate={{ opacity: [0.2, 1, 0.2] }}
-                  transition={{ duration: Math.random() * 3 + 1, repeat: Infinity, delay: Math.random() * 2 }}
+                  transition={{ duration: star.duration, repeat: Infinity, delay: star.delay }}
                 />
               ))}
             </div>
@@ -823,7 +832,7 @@ export default function App() {
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${dk ? 'bg-white/10' : 'bg-gray-200'}`}>
                     <motion.div
                       className={`h-full rounded-full transition-colors ${timeLeft <= 10 ? 'bg-red-400' : 'bg-indigo-400'}`}
-                      style={{ width: `${(timeLeft / 45) * 100}%` }}
+                      style={{ width: `${(timeLeft / hostTimeLimit) * 100}%` }}
                       transition={{ duration: 0.5 }}
                     />
                   </div>

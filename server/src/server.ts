@@ -414,6 +414,13 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomCode);
     if (!room) { socket.emit('error', { message: `Room "${roomCode}" does not exist.` }); return; }
 
+    if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+      socket.emit('error', { message: 'Prompt cannot be empty.' }); return;
+    }
+    if (prompt.length > 2000) {
+      socket.emit('error', { message: 'Prompt exceeds 2000 character limit.' }); return;
+    }
+
     const player = room.players.find((p) => p.socketId === socket.id);
     const playerName = player?.playerName ?? 'Unknown';
 
@@ -485,7 +492,43 @@ io.on('connection', (socket) => {
   // ── disconnect ───────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
+
+    for (const [roomCode, room] of rooms) {
+      const playerIndex = room.players.findIndex((p) => p.socketId === socket.id);
+      if (playerIndex === -1) continue;
+
+      // If host disconnects, stop the timer and notify remaining players
+      if (socket.id === room.hostId) {
+        if (room.timerInterval) {
+          clearInterval(room.timerInterval);
+          room.timerInterval = null;
+        }
+        // Schedule room cleanup after 5 minutes (gives time to rejoin)
+        setTimeout(() => {
+          const r = rooms.get(roomCode);
+          if (r && r.hostId === socket.id) {
+            rooms.delete(roomCode);
+            console.log(`Room ${roomCode} deleted — host never rejoined`);
+          }
+        }, 5 * 60 * 1000);
+      }
+      break;
+    }
   });
 });
+
+// ─── Stale room cleanup (every 10 minutes) ───────────────────────────────────
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour
+  for (const [code, room] of rooms) {
+    // A room with no active players that has been in a terminal state
+    const hasActivePlayers = io.sockets.adapter.rooms.has(code);
+    if (!hasActivePlayers) {
+      if (room.timerInterval) clearInterval(room.timerInterval);
+      rooms.delete(code);
+      console.log(`Cleaned up abandoned room: ${code}`);
+    }
+  }
+}, 10 * 60 * 1000);
 
 httpServer.listen(Number(process.env.PORT) || 3000, '0.0.0.0', () => console.log('Server live on port 3000'));
